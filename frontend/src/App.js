@@ -1,63 +1,79 @@
+
 import React, { useEffect, useState } from 'react';
-import { get } from './api';
-import Login from './components/Login';
-import RegisterOrg from './components/RegisterOrg';
-import EmployeesPage from './components/EmployeesPage';
-import TeamsPage from './components/TeamsPage';
+import { getEmployees, addEmployee, getTeams, addTeam, assignTeam } from './api';
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [view, setView] = useState('login');
+  const [employees, setEmployees] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [empName, setEmpName] = useState('');
+  const [empEmail, setEmpEmail] = useState('');
+  const [teamName, setTeamName] = useState('');
+  const [selectedTeam, setSelectedTeam] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('hrms_token');
-    if (token) {
-      get('/me').then(u => { setUser(u); setView('employees'); }).catch(() => { localStorage.removeItem('hrms_token'); setView('login'); });
-    }
+    fetchEmployees();
+    fetchTeams();
   }, []);
 
-  function onLogin({ token, user }) {
-    localStorage.setItem('hrms_token', token);
-    setUser(user);
-    setView('employees');
-  }
+  const fetchEmployees = async () => setEmployees((await getEmployees()).data);
+  const fetchTeams = async () => setTeams((await getTeams()).data);
 
-  function onLogout() {
-    localStorage.removeItem('hrms_token');
-    setUser(null);
-    setView('login');
-  }
+  const handleAddEmployee = async () => {
+    if (!empName || !empEmail) return alert('Enter all fields');
+    await addEmployee({ name: empName, email: empEmail });
+    setEmpName(''); setEmpEmail('');
+    fetchEmployees();
+  };
+
+  const handleAddTeam = async () => {
+    if (!teamName) return alert('Enter team name');
+    await addTeam({ name: teamName });
+    setTeamName('');
+    fetchTeams();
+  };
+
+  const handleAssignTeam = async (empId) => {
+    if (!selectedTeam) return alert('Select a team');
+    await assignTeam(empId, selectedTeam);
+    fetchEmployees();
+  };
 
   return (
-    <div className="container">
-      <div className="header">
-        <div>
-          <h2>HRMS</h2>
-          <div className="small">Manage employees & teams</div>
-        </div>
-        <div>
-          {user ? (
-            <>
-              <span style={{marginRight:12}}>Hi, {user.name || user.email}</span>
-              <button className="btn secondary" onClick={() => setView('employees')}>Employees</button>
-              <button className="btn secondary" onClick={() => setView('teams')} style={{ marginLeft:8 }}>Teams</button>
-              <button className="btn" onClick={onLogout} style={{ marginLeft:12 }}>Logout</button>
-            </>
-          ) : (
-            <>
-              <button className="btn" onClick={() => setView('login')}>Login</button>
-              <button className="btn secondary" onClick={() => setView('register')}>Register Org</button>
-            </>
-          )}
-        </div>
+    <div style={{ padding: '20px' }}>
+      <h1>HRMS</h1>
+
+      <div style={{ marginBottom: '20px' }}>
+        <h2>Add Employee</h2>
+        <input placeholder="Name" value={empName} onChange={e => setEmpName(e.target.value)} />
+        <input placeholder="Email" value={empEmail} onChange={e => setEmpEmail(e.target.value)} />
+        <button onClick={handleAddEmployee}>Add Employee</button>
       </div>
 
-      {view === 'login' && <Login onLogin={onLogin} />}
-      {view === 'register' && <RegisterOrg onRegistered={onLogin} />}
-      {view === 'employees' && user && <EmployeesPage />}
-      {view === 'teams' && user && <TeamsPage />}
+      <div style={{ marginBottom: '20px' }}>
+        <h2>Add Team</h2>
+        <input placeholder="Team Name" value={teamName} onChange={e => setTeamName(e.target.value)} />
+        <button onClick={handleAddTeam}>Add Team</button>
+      </div>
+
+      <div>
+        <h2>Employees</h2>
+        <select value={selectedTeam} onChange={e => setSelectedTeam(e.target.value)}>
+          <option value="">Select Team to Assign</option>
+          {teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+        </select>
+        <ul>
+          {employees.map(emp => (
+            <li key={emp.id}>
+              {emp.name} ({emp.email}) - Team: {emp.teamId ? teams.find(t => t.id === emp.teamId)?.name : 'None'}
+              <button onClick={() => handleAssignTeam(emp.id)} style={{ marginLeft: '10px' }}>Assign Team</button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
 
 export default App;
+
+
